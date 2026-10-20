@@ -52,8 +52,8 @@ jobs:
           esac
 
           etjs_action_home="$(mktemp -d)"
-          export HOME="$etjs_action_home"
-          etjs_docker_config="$HOME/.docker"
+          etjs_docker_config="$etjs_action_home/docker"
+          export DOCKER_CONFIG="$etjs_docker_config"
           etjs_docker="/Applications/Docker.app/Contents/Resources/bin/docker"
           install -d -m 0700 "$etjs_docker_config"
           printf '%s\n' \
@@ -78,12 +78,21 @@ jobs:
               --name wolfet-wasm --driver docker-container --use
           fi
           "$etjs_docker" --config "$etjs_docker_config" buildx inspect --bootstrap
-          "$etjs_docker" --config "$etjs_docker_config" buildx build \
+          "$etjs_docker" --config "$etjs_docker_config" pull "$DOCKERHUB_USERNAME/wolfet-wasm:$etjs_image_tag"
+          python3 security/verify-ca.py "$DOCKERHUB_USERNAME/wolfet-wasm:$etjs_image_tag" --output ca-old.json
+          "$etjs_docker" --config "$etjs_docker_config" buildx build --pull --no-cache \
             --platform linux/amd64 \
-            --push \
+            --load \
             --provenance=mode=max \
             --sbom=true \
             --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$GITHUB_SHA" \
             --tag "$DOCKERHUB_USERNAME/wolfet-wasm:$etjs_image_tag" \
             .
+
+          python3 security/verify-ca.py "$DOCKERHUB_USERNAME/wolfet-wasm:$etjs_image_tag" --baseline ca-old.json --output ca-new.json
+          "$etjs_docker" --config "$etjs_docker_config" push "$DOCKERHUB_USERNAME/wolfet-wasm:$etjs_image_tag"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ca-verification
+          path: ca-*.json
