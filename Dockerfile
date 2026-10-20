@@ -109,3 +109,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10m --retries=3 \
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/opt/wolfet-wasm/docker/entrypoint.sh"]
 CMD ["node", "server/index.js"]
+
+COPY security/remove-g3.sh /usr/local/sbin/remove-g3
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
+    && sh /usr/local/sbin/remove-g3 && rm -rf /var/lib/apt/lists/*
+ENV NODE_OPTIONS=--use-openssl-ca SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
